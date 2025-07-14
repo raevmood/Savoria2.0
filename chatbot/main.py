@@ -26,11 +26,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://resonant-begonia-82a549.netlify.app", 
-        "http://localhost:8000", 
-        "https://savoria20-production.up.railway.app"
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
