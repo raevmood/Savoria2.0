@@ -2,6 +2,7 @@ fastapi
 uvicorn
 langchain
 langchain-google-genai
+gunicorn
 langchain-community
 faiss-cpu
 google-generativeai
