@@ -1,6 +1,7 @@
 fastapi
 uvicorn
-langchain-huggingface
+langchain
+langchain-google-genai
 langchain-community
 faiss-cpu
 google-generativeai

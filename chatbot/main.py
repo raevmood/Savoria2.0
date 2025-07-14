@@ -2,8 +2,7 @@ import os
 import uvicorn
 from fastapi import FastAPI
 from pydantic import BaseModel
-from operator import itemgetter
-from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint 
+from operator import itemgetter 
 from langchain_community.vectorstores import FAISS
 from langchain_community.document_loaders import TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -13,6 +12,7 @@ from langchain_core.output_parsers import StrOutputParser
 from fastapi.middleware.cors import CORSMiddleware
 from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_core.messages import HumanMessage, AIMessage
+from langchain_google_genai import ChatGoogleGenerativeAI
 from gemini_embeddings import GeminiEmbeddings
 from throttling import apply_rate_limit
 from dotenv import load_dotenv
@@ -26,7 +26,11 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://resonant-begonia-82a549.netlify.app/", "http://localhost:8000, https://savoria20-production.up.railway.app/"],
+    allow_origins=[
+        "https://resonant-begonia-82a549.netlify.app", 
+        "http://localhost:8000", 
+        "https://savoria20-production.up.railway.app"
+    ],
     allow_credentials=True,
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
@@ -35,16 +39,19 @@ app.add_middleware(
 class RAGRequest(BaseModel):
     question: str
 
-if "HUGGINGFACEHUB_API_TOKEN" not in os.environ:
-    raise ValueError("Hugging Face API token not found in environment variables.")
+if "GEMINI_API_KEY" not in os.environ:
+    raise ValueError("Gemini API key not found in environment variables.")
 
-llm = HuggingFaceEndpoint(
-    repo_id="mistralai/Mixtral-8x7B-Instruct-v0.1",
-    temperature=0.7,
-    max_new_tokens=256,
-    top_p=0.95,
+api_key = os.getenv("GEMINI_API_KEY")
+if not api_key:
+    raise ValueError("Gemini API key not found in environment variables.")
+
+chat_model = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash",
+    temperature=0.9,
+    google_api_key=api_key
 )
-chat_model = ChatHuggingFace(llm=llm)
+
 embedding_model = GeminiEmbeddings()
 loader = TextLoader("context.txt")
 documents = loader.load()
@@ -64,7 +71,7 @@ prompt = ChatPromptTemplate.from_messages(
           context, which is preferable, or by referring the user to customer service via the contact us section.
           If a question does not concern the restaurant or its services, reply with "I cant help you with that.
           Please ask questions relevant to your experience here at Savoria."
-          Always respond in 45 words or less!
+          Always respond in 50 words or less!
           Never expressly admit to not having the necessary information to answer a question!
           Context: {context}"""
          ),
@@ -102,6 +109,7 @@ async def clear_memory():
 @app.post("/ask_rag")
 async def ask_rag_endpoint(request: RAGRequest):
     user_input = request.question
+    apply_rate_limit("global_unauthenticated_user")
     response = rag_chain.invoke({"input": user_input})
     chat_history.add_message(HumanMessage(content=user_input))
     chat_history.add_message(AIMessage(content=response))
